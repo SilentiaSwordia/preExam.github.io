@@ -193,4 +193,35 @@ window.onload = () => {
     console.log("Logikk for dashboard klar.");
     hentUtstyr();
   }
+  // Legg til dette nederst i script.js i side-kontrolløren
+  if (document.getElementById("utstyr-liste")) {
+    hentUtstyr();
+
+    // Sjekk om brukeren er admin og skjul skjemaet hvis ikke
+    sjekkAdminStatus();
+  }
+
+  async function sjekkAdminStatus() {
+    const {
+      data: { user },
+    } = await _supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await _supabase
+      .from("profiler")
+      .select("er_admin")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !data.er_admin) {
+      // Hvis ikke admin: Skjul skjemaet for å legge til utstyr
+      const adminPanel = document.querySelector(".admin-panel");
+      if (adminPanel) adminPanel.style.display = "none";
+
+      // Du kan også skjule "Sjekk ut/inn"-knappene i tabellen her
+      console.log("Bruker er ikke admin. Skjuler admin-funksjoner.");
+    } else {
+      console.log("Velkommen, Admin!");
+    }
+  }
 };
