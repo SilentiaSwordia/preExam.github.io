@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - Utstyr</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <nav class="navbar">
+      <div class="nav-logo">IT-Lager Pro</div>
+      <div class="nav-actions">
+        <span id="user-display">Logget inn</span>
+        <button onclick="handleLogout()" class="btn-logout">Logg ut</button>
+      </div>
+    </nav>
+
+    <div class="container">
+      <section class="admin-panel">
+        <h2>Registrer nytt utstyr</h2>
+        <div class="input-group">
+          <input
+            type="text"
+            id="navn"
+            placeholder="Navn (f.eks. MacBook Pro)"
+          />
+          <input type="text" id="type" placeholder="Type (f.eks. Laptop)" />
+          <input type="text" id="sn" placeholder="Serienummer" />
+          <button onclick="leggTilUtstyr()" class="btn-save">
+            Lagre i databasen
+          </button>
+        </div>
+      </section>
+
+      <hr />
+
+      <section class="list-panel">
+        <h2>Utstyrsoversikt</h2>
+        <div id="utstyr-liste">
+          <p>Henter data fra Supabase...</p>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
