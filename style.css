@@ -123,3 +123,7 @@ td {
 .btn-status:hover {
   background-color: #2980b9;
 }
+
+.admin-panel {
+  display: none; /* Skjult helt til JS bekrefter admin-status */
+}

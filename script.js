@@ -198,30 +198,32 @@ window.onload = () => {
     hentUtstyr();
 
     // Sjekk om brukeren er admin og skjul skjemaet hvis ikke
-    sjekkAdminStatus();
+    oppdaterGrensesnitt();
   }
 
-  async function sjekkAdminStatus() {
+  async function oppdaterGrensesnitt() {
     const {
       data: { user },
     } = await _supabase.auth.getUser();
     if (!user) return;
 
-    const { data, error } = await _supabase
+    // Vis alltid skjemaet for å legge til utstyr til innloggede brukere
+    const adminPanel = document.querySelector(".admin-panel");
+    if (adminPanel) adminPanel.style.display = "block";
+
+    // Sjekk om de er admin for å gi ekstra info/rettigheter
+    const { data: profil } = await _supabase
       .from("profiler")
       .select("er_admin")
       .eq("id", user.id)
       .single();
 
-    if (error || !data.er_admin) {
-      // Hvis ikke admin: Skjul skjemaet for å legge til utstyr
-      const adminPanel = document.querySelector(".admin-panel");
-      if (adminPanel) adminPanel.style.display = "none";
-
-      // Du kan også skjule "Sjekk ut/inn"-knappene i tabellen her
-      console.log("Bruker er ikke admin. Skjuler admin-funksjoner.");
+    if (profil && profil.er_admin) {
+      document.getElementById("user-display").innerText =
+        "Logget inn som: ADMIN";
     } else {
-      console.log("Velkommen, Admin!");
+      document.getElementById("user-display").innerText =
+        "Logget inn som: Bruker";
     }
   }
 };
