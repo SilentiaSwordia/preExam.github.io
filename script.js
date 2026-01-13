@@ -79,26 +79,37 @@ async function leggTilUtstyr() {
   const type = document.getElementById("type").value;
   const sn = document.getElementById("sn").value;
 
-  if (!navn || !type) {
-    alert("Navn og type må fylles ut!");
+  // 1. Hent den innloggede brukeren fra Supabase Auth
+  const {
+    data: { user },
+  } = await _supabase.auth.getUser();
+
+  if (!user) {
+    alert("Du må være logget inn for å registrere utstyr!");
     return;
   }
 
-  const { error } = await _supabase
-    .from("utstyr")
-    .insert([{ navn, type, serienummer: sn, status: "Ledig" }]);
+  // 2. Send data, inkludert brukerens UUID (user.id)
+  const { error } = await _supabase.from("utstyr").insert([
+    {
+      navn: navn,
+      type: type,
+      serienummer: sn,
+      status: "Ledig",
+      ansvarlig_bruker: user.id, // Her legger vi inn UUID-en
+    },
+  ]);
 
   if (error) {
     alert("Feil: " + error.message);
   } else {
-    // Tøm feltene og oppdater tabellen
+    // Tøm feltene og oppdater
     document.getElementById("navn").value = "";
     document.getElementById("type").value = "";
     document.getElementById("sn").value = "";
     hentUtstyr();
   }
 }
-
 // Algoritme for å tegne tabellen i HTML
 // Dekker mål: "Vurdere brukergrensesnitt og designe tjenester"
 function visUtstyr(utstyrsListe) {
