@@ -92,9 +92,9 @@ async function leggTilUtstyr() {
   // 2. Send data, inkludert brukerens UUID (user.id)
   const { error } = await _supabase.from("utstyr").insert([
     {
-      navn: navn,
-      type: type,
-      serienummer: sn,
+      navn: document.getElementById("navn").value,
+      type: document.getElementById("type").value,
+      serienummer: document.getElementById("sn").value,
       status: "Ledig",
       ansvarlig_bruker: user.id, // Her legger vi inn UUID-en
     },
@@ -303,33 +303,44 @@ window.onload = () => {
     const {
       data: { user },
     } = await _supabase.auth.getUser();
-    if (!user) return;
 
-    const { data: profil, error } = await _supabase
+    // Hvis ingen er logget inn, skjul alt og avslutt
+    if (!user) {
+      document.querySelector(".admin-panel").style.display = "none";
+      document.getElementById("logg-panel").style.display = "none";
+      return;
+    }
+
+    // 1. VIS ALLTID panelet for å legge til utstyr for innloggede brukere
+    const adminPanel = document.querySelector(".admin-panel");
+    if (adminPanel) adminPanel.style.display = "block";
+
+    // 2. Sjekk om brukeren er admin i databasen
+    const { data: profil } = await _supabase
       .from("profiler")
       .select("er_admin")
       .eq("id", user.id)
       .single();
 
-    const adminPanel = document.querySelector(".admin-panel");
     const loggPanel = document.getElementById("logg-panel");
 
     if (profil && profil.er_admin === true) {
-      console.log("Suksess: Du er logget inn som ADMIN");
+      console.log("Status: ADMIN bekreftet");
 
-      // 1. Vis admin-delene
-      if (adminPanel) adminPanel.style.display = "block";
+      // Vis logg-panelet kun for admin
       if (loggPanel) loggPanel.style.display = "block";
 
-      // 2. HER KALLER DU LOGGEN:
+      // Hent loggen
       hentLogg();
 
       document.getElementById("user-display").innerText =
         "Logget inn som: Admin";
     } else {
-      console.log("Bruker er IKKE admin");
-      if (adminPanel) adminPanel.style.display = "none";
+      console.log("Status: Standard bruker");
+
+      // Skjul logg-panelet for vanlige brukere
       if (loggPanel) loggPanel.style.display = "none";
+
       document.getElementById("user-display").innerText =
         "Logget inn som: Bruker";
     }
