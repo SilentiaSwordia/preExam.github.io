@@ -255,17 +255,24 @@ async function hentLogg() {
   data.forEach((innslag) => {
     const dato = new Date(innslag.tidspunkt).toLocaleString("no-NO");
 
-    // Her henter vi e-posten fra den koblede profil-tabellen
-    const brukerEpost = innslag.profiler
-      ? innslag.profiler.email
-      : "Mangler i profiltabell";
+    // Vi bruker 'innslag.profiler' fordi det er navnet på tabellen vi joiner med
+    // Sjekk om objektet eksisterer, hvis ikke bruk en nødløsning
+    let brukerInfo = "Ukjent bruker";
+
+    if (innslag.profiler && innslag.profiler.email) {
+      brukerInfo = innslag.profiler.email;
+    } else {
+      // Hvis vi har en bruker_id i loggen, men ingen profil, skriv ID-en så vi kan feilsøke
+      brukerInfo =
+        "Mangler profil (" + innslag.bruker_id.substring(0, 5) + "...)";
+    }
 
     html += `
         <tr>
             <td>${dato}</td>
-            <td>${innslag.utstyr ? innslag.utstyr.navn : "Slettet utstyr"}</td>
+            <td>${innslag.utstyr ? innslag.utstyr.navn : "Slettet"}</td>
             <td>${innslag.handling}</td>
-            <td>${brukerEpost}</td>
+            <td>${brukerInfo}</td>
         </tr>
     `;
   });
