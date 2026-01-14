@@ -160,22 +160,120 @@ function visUtstyr(utstyrsListe) {
 }
 
 async function endreStatus(id, nåværendeStatus) {
-  // Bestem hva den nye statusen skal være
   const nyStatus = nåværendeStatus === "Ledig" ? "I bruk" : "Ledig";
+  const handling = nyStatus === "I bruk" ? "Sjekket ut" : "Levert inn";
 
-  const { error } = await _supabase
+  // 1. Forsøk å oppdatere selve utstyret først
+  const {
+    data,
+    error: updateError,
+    status,
+  } = await _supabase
     .from("utstyr")
     .update({ status: nyStatus })
-    .eq("id", id);
+    .eq("id", id)
+    .select(); // Vi legger til .select() for å bekrefte at noe ble endret
 
-  if (error) {
-    alert("Kunne ikke endre status: " + error.message);
-  } else {
-    // Oppdater tabellen på skjermen med en gang
-    hentUtstyr();
+  // 2. Sjekk om oppdateringen faktisk ble utført
+  // Hvis brukeren ikke har RLS-tilgang, vil 'data' være tom, eller vi får en feil.
+  if (updateError || !data || data.length === 0) {
+    console.error("Oppdatering avvist av RLS eller feil:", updateError);
+    alert("Du har ikke rettigheter til å endre status på dette utstyret.");
+    return; // AVSLUTT HER – koden under (loggingen) vil aldri kjøre
+  }
+
+  // 3. HVIS vi kom hit, betyr det at oppdateringen var vellykket.
+  // NÅ kan vi logge handlingen.
+  const {
+    data: { user },
+  } = await _supabase.auth.getUser();
+
+  const { error: logError } = await _supabase
+    .from("utstyr_logg")
+    .insert([{ utstyr_id: id, bruker_id: user.id, handling: handling }]);
+
+  if (logError) {
+    console.error("Kunne ikke lagre i logg:", logError.message);
+  }
+
+  // 4. Oppdater visningen på nettsiden
+  hentUtstyr();
+
+  // Sjekk om hentLogg eksisterer (hvis man er admin) før den kalles
+  if (typeof hentLogg === "function") {
+    hentLogg();
   }
 }
 
+async function hentLogg() {
+  // 1. Sjekk først om brukeren i det hele tatt er admin
+  const {
+    data: { user },
+  } = await _supabase.auth.getUser();
+  const { data: profil } = await _supabase
+    .from("profiler")
+    .select("er_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profil || !profil.er_admin) {
+    document.getElementById("logg-panel").style.display = "none";
+    return; // Avslutt funksjonen hvis brukeren ikke er admin
+  }
+
+  // 2. Hent loggen med "joins" til både utstyr og profiler (for å få e-post)
+  const { data, error } = await _supabase
+    .from("utstyr_logg")
+    .select(
+      `
+            handling,
+            tidspunkt,
+            utstyr ( navn ),
+            profiler ( email )
+        `
+    )
+    .order("tidspunkt", { ascending: false });
+
+  if (error) {
+    console.error("Logg-feil:", error.message);
+    return;
+  }
+
+  let html = `
+        <table class="logg-tabell">
+            <thead>
+                <tr>
+                    <th>Tidspunkt</th>
+                    <th>Utstyr</th>
+                    <th>Handling</th>
+                    <th>Utført av</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+  data.forEach((innslag) => {
+    const dato = new Date(innslag.tidspunkt).toLocaleString("no-NO");
+
+    // Her henter vi e-posten fra den koblede profil-tabellen
+    const brukerEpost = innslag.profiler
+      ? innslag.profiler.email
+      : "Mangler i profiltabell";
+
+    html += `
+        <tr>
+            <td>${dato}</td>
+            <td>${innslag.utstyr ? innslag.utstyr.navn : "Slettet utstyr"}</td>
+            <td>${innslag.handling}</td>
+            <td>${brukerEpost}</td>
+        </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  document.getElementById("logg-liste").innerHTML = html;
+  document.getElementById("logg-panel").style.display = "block";
+}
 // ==========================================
 // 4. SIDE-KONTROLLØREN (Kjøres ved oppstart)
 // ==========================================
@@ -198,30 +296,40 @@ window.onload = () => {
     hentUtstyr();
 
     // Sjekk om brukeren er admin og skjul skjemaet hvis ikke
-    oppdaterGrensesnitt();
+    sjekkAdminStatus();
   }
 
-  async function oppdaterGrensesnitt() {
+  async function sjekkAdminStatus() {
     const {
       data: { user },
     } = await _supabase.auth.getUser();
     if (!user) return;
 
-    // Vis alltid skjemaet for å legge til utstyr til innloggede brukere
-    const adminPanel = document.querySelector(".admin-panel");
-    if (adminPanel) adminPanel.style.display = "block";
-
-    // Sjekk om de er admin for å gi ekstra info/rettigheter
-    const { data: profil } = await _supabase
+    const { data: profil, error } = await _supabase
       .from("profiler")
       .select("er_admin")
       .eq("id", user.id)
       .single();
 
-    if (profil && profil.er_admin) {
+    const adminPanel = document.querySelector(".admin-panel");
+    const loggPanel = document.getElementById("logg-panel");
+
+    if (profil && profil.er_admin === true) {
+      console.log("Suksess: Du er logget inn som ADMIN");
+
+      // 1. Vis admin-delene
+      if (adminPanel) adminPanel.style.display = "block";
+      if (loggPanel) loggPanel.style.display = "block";
+
+      // 2. HER KALLER DU LOGGEN:
+      hentLogg();
+
       document.getElementById("user-display").innerText =
-        "Logget inn som: ADMIN";
+        "Logget inn som: Admin";
     } else {
+      console.log("Bruker er IKKE admin");
+      if (adminPanel) adminPanel.style.display = "none";
+      if (loggPanel) loggPanel.style.display = "none";
       document.getElementById("user-display").innerText =
         "Logget inn som: Bruker";
     }
