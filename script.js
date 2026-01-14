@@ -206,22 +206,6 @@ async function endreStatus(id, nåværendeStatus) {
 }
 
 async function hentLogg() {
-  // 1. Sjekk først om brukeren i det hele tatt er admin
-  const {
-    data: { user },
-  } = await _supabase.auth.getUser();
-  const { data: profil } = await _supabase
-    .from("profiler")
-    .select("er_admin")
-    .eq("id", user.id)
-    .single();
-
-  if (!profil || !profil.er_admin) {
-    document.getElementById("logg-panel").style.display = "none";
-    return; // Avslutt funksjonen hvis brukeren ikke er admin
-  }
-
-  // 2. Hent loggen med "joins" til både utstyr og profiler (for å få e-post)
   const { data, error } = await _supabase
     .from("utstyr_logg")
     .select(
@@ -234,52 +218,42 @@ async function hentLogg() {
     )
     .order("tidspunkt", { ascending: false });
 
+  // FEILSØKING: Hvis tabellen ikke dukker opp, sjekk hva som står i konsollen her:
   if (error) {
-    console.error("Logg-feil:", error.message);
+    console.error("LOGG-FEIL DETALJER:", error.message);
+    document.getElementById("logg-liste").innerHTML =
+      "<p style='color:red'>Kunne ikke laste logg: " + error.message + "</p>";
     return;
   }
 
-  let html = `
-        <table class="logg-tabell">
-            <thead>
-                <tr>
-                    <th>Tidspunkt</th>
-                    <th>Utstyr</th>
-                    <th>Handling</th>
-                    <th>Utført av</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
+  if (!data || data.length === 0) {
+    document.getElementById("logg-liste").innerHTML =
+      "<p>Ingen historikk funnet.</p>";
+    return;
+  }
+
+  let html = `<table><thead><tr><th>Tidspunkt</th><th>Utstyr</th><th>Handling</th><th>Bruker</th></tr></thead><tbody>`;
 
   data.forEach((innslag) => {
     const dato = new Date(innslag.tidspunkt).toLocaleString("no-NO");
 
-    // Vi bruker 'innslag.profiler' fordi det er navnet på tabellen vi joiner med
-    // Sjekk om objektet eksisterer, hvis ikke bruk en nødløsning
-    let brukerInfo = "Ukjent bruker";
-
-    if (innslag.profiler && innslag.profiler.email) {
-      brukerInfo = innslag.profiler.email;
-    } else {
-      // Hvis vi har en bruker_id i loggen, men ingen profil, skriv ID-en så vi kan feilsøke
-      brukerInfo =
-        "Mangler profil (" + innslag.bruker_id.substring(0, 5) + "...)";
-    }
+    // Sjekk nøye om profiler finnes før vi prøver å lese email
+    // Vi bruker ?. for å unngå at koden krasjer (Optional Chaining)
+    const epost = innslag.profiler?.email || "Ukjent (mangler i profil)";
+    const utstyrNavn = innslag.utstyr?.navn || "Slettet utstyr";
 
     html += `
-        <tr>
-            <td>${dato}</td>
-            <td>${innslag.utstyr ? innslag.utstyr.navn : "Slettet"}</td>
-            <td>${innslag.handling}</td>
-            <td>${brukerInfo}</td>
-        </tr>
-    `;
+            <tr>
+                <td>${dato}</td>
+                <td>${utstyrNavn}</td>
+                <td>${innslag.handling}</td>
+                <td>${epost}</td>
+            </tr>
+        `;
   });
 
   html += `</tbody></table>`;
   document.getElementById("logg-liste").innerHTML = html;
-  document.getElementById("logg-panel").style.display = "block";
 }
 // ==========================================
 // 4. SIDE-KONTROLLØREN (Kjøres ved oppstart)
