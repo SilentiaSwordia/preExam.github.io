@@ -7,15 +7,30 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div id="auth-container">
-      <h2>Logg inn - Utstyr</h2>
-      <input type="email" id="email" placeholder="Din e-post" />
-      <input type="password" id="password" placeholder="Ditt passord" />
-
-      <button onclick="handleSignUp()">Registrer ny bruker</button>
-      <button onclick="handleLogin()">Logg inn</button>
-
-      <p id="auth-message"></p>
+    <nav class="navbar">
+      <div class="nav-logo">IT-avdeling - Startside</div>
+    </nav>
+    <div id="auth-container" class="container display-flex">
+      <h2 style="align-self: start">Logg inn</h2>
+      <div class="input-group-field" style="display: flex !important">
+        <input
+          class="text-field"
+          type="email"
+          id="email"
+          placeholder="Din e-post"
+        />
+        <input
+          class="text-field"
+          type="password"
+          id="password"
+          placeholder="Ditt passord"
+        />
+      </div>
+      <div class="button-field" style="align-items: center !important">
+        <button onclick="handleSignUp()">Registrer ny bruker</button>
+        <button onclick="handleLogin()">Logg inn</button>
+        <p id="auth-message"></p>
+      </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

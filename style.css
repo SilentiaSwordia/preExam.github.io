@@ -127,3 +127,31 @@ td {
 .admin-panel {
   display: none; /* Skjult helt til JS bekrefter admin-status */
 }
+
+.input-group-field {
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  align-self: center;
+}
+
+.input-group-field div {
+  display: flex !important;
+}
+
+.text-field {
+  width: 60%;
+  margin-bottom: 10px;
+}
+
+.button-field {
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.display-flex {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+}
