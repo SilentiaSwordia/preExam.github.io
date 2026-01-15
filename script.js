@@ -59,6 +59,8 @@ async function handleLogout() {
 // ==========================================
 // Dekker mål: "Anvende relevante programmeringsspråk og algoritmer"
 
+// Nesten alt under her er copy/paste fra Gemini fordi jeg ikke hadde peiling på hvordan jeg skulle gjøre dette selv.
+// Det handler om at jeg har satt flere tabeller inn som linker til Supabase og at jeg ikke helt forstod hvordan jeg skulle få det til å fungere med autentisering og RLS.
 // Hente utstyr fra databasen
 async function hentUtstyr() {
   const { data, error } = await _supabase
