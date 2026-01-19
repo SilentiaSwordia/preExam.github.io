@@ -148,8 +148,8 @@ function visUtstyr(utstyrsListe) {
             <td>${enhet.serienummer || "---"}</td>
             <td>
                 <button onclick="endreStatus(${enhet.id}, '${
-      enhet.status
-    }')" class="btn-status">
+                  enhet.status
+                }')" class="btn-status">
                     ${knappTekst}
                 </button>
             </td>
@@ -162,34 +162,38 @@ function visUtstyr(utstyrsListe) {
 }
 
 async function endreStatus(id, nåværendeStatus) {
+  // Finn ut hva den nye statusen skal være
   const nyStatus = nåværendeStatus === "Ledig" ? "I bruk" : "Ledig";
   const handling = nyStatus === "I bruk" ? "Sjekket ut" : "Levert inn";
 
-  // 1. Forsøk å oppdatere selve utstyret først
-  const {
-    data,
-    error: updateError,
-    status,
-  } = await _supabase
-    .from("utstyr")
-    .update({ status: nyStatus })
-    .eq("id", id)
-    .select(); // Vi legger til .select() for å bekrefte at noe ble endret
-
-  // 2. Sjekk om oppdateringen faktisk ble utført
-  // Hvis brukeren ikke har RLS-tilgang, vil 'data' være tom, eller vi får en feil.
-  if (updateError || !data || data.length === 0) {
-    console.error("Oppdatering avvist av RLS eller feil:", updateError);
-    alert("Du har ikke rettigheter til å endre status på dette utstyret.");
-    return; // AVSLUTT HER – koden under (loggingen) vil aldri kjøre
-  }
-
-  // 3. HVIS vi kom hit, betyr det at oppdateringen var vellykket.
-  // NÅ kan vi logge handlingen.
+  // Hent brukeren som trykker på knappen
   const {
     data: { user },
   } = await _supabase.auth.getUser();
 
+  // NY LOGIKK:
+  // Hvis tingen blir 'I bruk', lagrer vi ID-en til brukeren i 'laant_av'.
+  // Hvis tingen blir 'Ledig', setter vi 'laant_av' til null (ingen har den lenger).
+  const hvemHarDen = nyStatus === "I bruk" ? user.id : null;
+
+  // 1. Forsøk å oppdatere utstyret med BÅDE status og laant_av
+  const { data, error: updateError } = await _supabase
+    .from("utstyr")
+    .update({
+      status: nyStatus,
+      laant_av: hvemHarDen, // <--- Viktig tillegg!
+    })
+    .eq("id", id)
+    .select();
+
+  // 2. Sjekk om oppdateringen faktisk ble utført (RLS-sjekk)
+  if (updateError || !data || data.length === 0) {
+    console.error("Oppdatering avvist av RLS eller feil:", updateError);
+    alert("Du har ikke rettigheter til å endre status på dette utstyret.");
+    return;
+  }
+
+  // 3. Logg handlingen i historikken
   const { error: logError } = await _supabase
     .from("utstyr_logg")
     .insert([{ utstyr_id: id, bruker_id: user.id, handling: handling }]);
@@ -201,9 +205,13 @@ async function endreStatus(id, nåværendeStatus) {
   // 4. Oppdater visningen på nettsiden
   hentUtstyr();
 
-  // Sjekk om hentLogg eksisterer (hvis man er admin) før den kalles
+  // Oppdater loggen og purrevisningen hvis de finnes (for admin)
   if (typeof hentLogg === "function") {
     hentLogg();
+  }
+
+  if (typeof oppdaterPurreVisning === "function") {
+    oppdaterPurreVisning();
   }
 }
 
@@ -257,6 +265,35 @@ async function hentLogg() {
   html += `</tbody></table>`;
   document.getElementById("logg-liste").innerHTML = html;
 }
+
+async function simulerGammeltUtlaan(id) {
+  const { error } = await _supabase.rpc("jukse_med_tiden", { utstyr_id: id });
+  if (error) console.error(error);
+  else {
+    alert(
+      "Suksess! Dette utstyret er nå registrert som utlånt for 15 dager siden."
+    );
+    hentUtstyr();
+    if (typeof oppdaterPurreVisning === "function") oppdaterPurreVisning();
+  }
+}
+
+async function oppdaterPurreVisning() {
+  // Henter fra VIEW-en vi laget tidligere
+  const { data, error } = await _supabase.from("utstyr_over_frist").select("*");
+
+  if (data && data.length > 0) {
+    document.getElementById("purre-seksjon").style.display = "block";
+    let html = "<ul>";
+    data.forEach((item) => {
+      html += `<li><strong>${item.email}</strong> har hatt <strong>${item.utstyr_navn}</strong> i over 14 dager!</li>`;
+    });
+    html += "</ul>";
+    document.getElementById("purre-liste").innerHTML = html;
+  } else {
+    document.getElementById("purre-seksjon").style.display = "none";
+  }
+}
 // ==========================================
 // 4. SIDE-KONTROLLØREN (Kjøres ved oppstart)
 // ==========================================
@@ -291,6 +328,7 @@ window.onload = () => {
     if (!user) {
       document.querySelector(".admin-panel").style.display = "none";
       document.getElementById("logg-panel").style.display = "none";
+      document.getElementById("purre-seksjon").style.display = "none";
       return;
     }
 
@@ -306,6 +344,7 @@ window.onload = () => {
       .single();
 
     const loggPanel = document.getElementById("logg-panel");
+    const purreSeksjon = document.getElementById("purre-seksjon");
 
     if (profil && profil.er_admin === true) {
       console.log("Status: ADMIN bekreftet");
@@ -315,6 +354,7 @@ window.onload = () => {
 
       // Hent loggen
       hentLogg();
+      oppdaterPurreVisning();
 
       document.getElementById("user-display").innerText =
         "Logget inn som: Admin";
@@ -323,6 +363,7 @@ window.onload = () => {
 
       // Skjul logg-panelet for vanlige brukere
       if (loggPanel) loggPanel.style.display = "none";
+      if (purreSeksjon) purreSeksjon.style.display = "none";
 
       document.getElementById("user-display").innerText =
         "Logget inn som: Bruker";
