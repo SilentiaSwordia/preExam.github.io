@@ -324,16 +324,21 @@ window.onload = () => {
       data: { user },
     } = await _supabase.auth.getUser();
 
+    const knapp = document.getElementById("admin-toggle-purring");
+    const purreSeksjon = document.getElementById("purre-seksjon");
+    const loggPanel = document.getElementById("logg-panel");
+    const adminPanel = document.querySelector(".admin-panel");
+
     // Hvis ingen er logget inn, skjul alt og avslutt
     if (!user) {
-      document.querySelector(".admin-panel").style.display = "none";
-      document.getElementById("logg-panel").style.display = "none";
-      document.getElementById("purre-seksjon").style.display = "none";
+      if (adminPanel) adminPanel.style.display = "none";
+      if (loggPanel) loggPanel.style.display = "none";
+      if (purreSeksjon) purreSeksjon.style.display = "none";
+      if (knapp) knapp.style.display = "none";
       return;
     }
 
-    // 1. VIS ALLTID panelet for å legge til utstyr for innloggede brukere
-    const adminPanel = document.querySelector(".admin-panel");
+    // 1. VIS panelet for å legge til utstyr for alle innloggede
     if (adminPanel) adminPanel.style.display = "block";
 
     // 2. Sjekk om brukeren er admin i databasen
@@ -343,27 +348,43 @@ window.onload = () => {
       .eq("id", user.id)
       .single();
 
-    const loggPanel = document.getElementById("logg-panel");
-    const purreSeksjon = document.getElementById("purre-seksjon");
-
     if (profil && profil.er_admin === true) {
       console.log("Status: ADMIN bekreftet");
 
-      // Vis logg-panelet kun for admin
+      // Vis logg og knapp for admin
       if (loggPanel) loggPanel.style.display = "block";
+      if (knapp) {
+        knapp.style.display = "block";
+        // Legg til klikk-funksjonen her
+        knapp.onclick = () => {
+          if (purreSeksjon.style.display === "none") {
+            purreSeksjon.style.display = "block";
+            knapp.innerText = "🔔 Skjul Purringer";
+            knapp.style.background = "#333";
+          } else {
+            purreSeksjon.style.display = "none";
+            knapp.innerText = "🔔 Vis Purringer";
+            knapp.style.background = "#ff4444";
+          }
+        };
+      }
 
-      // Hent loggen
+      // Hent data i bakgrunnen
       hentLogg();
       oppdaterPurreVisning();
+
+      // Start med purre-seksjonen skjult selv om man er admin
+      if (purreSeksjon) purreSeksjon.style.display = "none";
 
       document.getElementById("user-display").innerText =
         "Logget inn som: Admin";
     } else {
       console.log("Status: Standard bruker");
 
-      // Skjul logg-panelet for vanlige brukere
+      // Skjul admin-verktøy for vanlige brukere
       if (loggPanel) loggPanel.style.display = "none";
       if (purreSeksjon) purreSeksjon.style.display = "none";
+      if (knapp) knapp.style.display = "none";
 
       document.getElementById("user-display").innerText =
         "Logget inn som: Bruker";
