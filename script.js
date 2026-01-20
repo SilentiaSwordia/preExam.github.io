@@ -279,19 +279,41 @@ async function simulerGammeltUtlaan(id) {
 }
 
 async function oppdaterPurreVisning() {
-  // Henter fra VIEW-en vi laget tidligere
   const { data, error } = await _supabase.from("utstyr_over_frist").select("*");
 
+  if (error) {
+    console.error("Feil ved henting av purredata:", error);
+    return;
+  }
+
+  const purreListe = document.getElementById("purre-liste");
+
   if (data && data.length > 0) {
-    document.getElementById("purre-seksjon").style.display = "block";
-    let html = "<ul>";
+    let html =
+      '<table style="width:100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em;">';
+    html +=
+      '<tr style="border-bottom: 2px solid red;"><th>Utstyr</th><th>Serienummer</th><th>Lånt av</th><th>Total tid</th></tr>';
+
     data.forEach((item) => {
-      html += `<li><strong>${item.email}</strong> har hatt <strong>${item.utstyr_navn}</strong> i over 14 dager!</li>`;
+      const faktiskeDager = Number.parseInt(item.dager_utlaant) || 0;
+      const demoDager = faktiskeDager + 14;
+      const sn = item.serienummer || "Mangler S/N";
+      html += `
+                <tr style="border-bottom: 1px solid #ffcccc;">
+                    <td style="padding: 8px;">${item.utstyr_navn}</td>
+                    <td style="padding: 8px; font-family: monospace;">${sn}</td>
+                    <td style="padding: 8px;">${item.email}</td>
+                    <td style="padding: 8px; font-weight: bold; color: #d00;">
+                        ${demoDager} dager
+                    </td>
+                </tr>`;
     });
-    html += "</ul>";
-    document.getElementById("purre-liste").innerHTML = html;
+
+    html += "</table>";
+    purreListe.innerHTML = html;
   } else {
-    document.getElementById("purre-seksjon").style.display = "none";
+    purreListe.innerHTML =
+      "<p>Ingen utstyr er markert som utlånt i systemet.</p>";
   }
 }
 // ==========================================
