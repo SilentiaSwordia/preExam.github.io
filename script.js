@@ -376,9 +376,6 @@ window.onload = () => {
       return;
     }
 
-    // 1. VIS panelet for å legge til utstyr for alle innloggede
-    if (adminPanel) adminPanel.style.display = "block";
-
     // 2. Sjekk om brukeren er admin i databasen
     const { data: profil } = await _supabase
       .from("profiler")
@@ -390,7 +387,7 @@ window.onload = () => {
       console.log("Status: ADMIN bekreftet");
       // Inne i sjekkAdminStatus, under logikken for "knapp" (purre-toggle)
       const tidKnapp = document.getElementById("toggle-tid-knapp");
-
+      if (adminPanel) adminPanel.style.display = "block";
       if (tidKnapp) {
         tidKnapp.style.display = "block";
         tidKnapp.onclick = () => {
@@ -436,6 +433,7 @@ window.onload = () => {
       if (loggPanel) loggPanel.style.display = "none";
       if (purreSeksjon) purreSeksjon.style.display = "none";
       if (knapp) knapp.style.display = "none";
+      if (adminPanel) adminPanel.style.display = "none";
 
       document.getElementById("user-display").innerText =
         "Logget inn som: Bruker";
