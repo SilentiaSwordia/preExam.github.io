@@ -62,9 +62,13 @@ async function handleLogout() {
 // Nesten alt under her er copy/paste fra Gemini fordi jeg ikke hadde peiling på hvordan jeg skulle gjøre dette selv.
 // Det handler om at jeg har satt flere tabeller inn som linker til Supabase og at jeg ikke helt forstod hvordan jeg skulle få det til å fungere med autentisering og RLS.
 // Hente utstyr fra databasen
+let visUtlaanstidAdmin = false; // Global variabel for å kontrollere admin-kolonnen
 async function hentUtstyr() {
+  // Vi sjekker om vi skal bruke admin-viewen eller den vanlige tabellen
+  const kilde = visUtlaanstidAdmin ? "admin_utstyr_oversikt" : "utstyr";
+
   const { data, error } = await _supabase
-    .from("utstyr")
+    .from(kilde)
     .select("*")
     .order("created_at", { ascending: false });
 
@@ -122,6 +126,7 @@ function visUtstyr(utstyrsListe) {
     return;
   }
 
+  // Overskrifter - vi legger til "Total tid" hvis admin-visning er på
   let html = `
         <table>
             <thead>
@@ -130,6 +135,8 @@ function visUtstyr(utstyrsListe) {
                     <th>Type</th>
                     <th>Status</th>
                     <th>Serienummer</th>
+                    ${visUtlaanstidAdmin ? "<th>Tid utlånt (Simulert)</th>" : ""}
+                    <th>Handling</th>
                 </tr>
             </thead>
             <tbody>
@@ -140,16 +147,25 @@ function visUtstyr(utstyrsListe) {
       enhet.status === "Ledig" ? "status-gronn" : "status-rod";
     const knappTekst = enhet.status === "Ledig" ? "Sjekk ut" : "Lever inn";
 
+    // Beregn tid kun hvis kolonnen er aktivert
+    let tidHtml = "";
+    if (visUtlaanstidAdmin) {
+      const dager =
+        enhet.status === "I bruk"
+          ? (Number.parseInt(enhet.dager_utlaant) || 0) + 14
+          : "---";
+      tidHtml = `<td>${dager} ${enhet.status === "I bruk" ? "dager" : ""}</td>`;
+    }
+
     html += `
         <tr>
             <td>${enhet.navn}</td>
             <td>${enhet.type}</td>
             <td><span class="${statusKlasse}">${enhet.status}</span></td>
             <td>${enhet.serienummer || "---"}</td>
+            ${tidHtml}
             <td>
-                <button onclick="endreStatus(${enhet.id}, '${
-                  enhet.status
-                }')" class="btn-status">
+                <button onclick="endreStatus(${enhet.id}, '${enhet.status}')" class="btn-status">
                     ${knappTekst}
                 </button>
             </td>
@@ -224,7 +240,7 @@ async function hentLogg() {
             tidspunkt,
             utstyr ( navn ),
             profiler ( email )
-        `
+        `,
     )
     .order("tidspunkt", { ascending: false });
 
@@ -271,7 +287,7 @@ async function simulerGammeltUtlaan(id) {
   if (error) console.error(error);
   else {
     alert(
-      "Suksess! Dette utstyret er nå registrert som utlånt for 15 dager siden."
+      "Suksess! Dette utstyret er nå registrert som utlånt for 15 dager siden.",
     );
     hentUtstyr();
     if (typeof oppdaterPurreVisning === "function") oppdaterPurreVisning();
@@ -372,6 +388,19 @@ window.onload = () => {
 
     if (profil && profil.er_admin === true) {
       console.log("Status: ADMIN bekreftet");
+      // Inne i sjekkAdminStatus, under logikken for "knapp" (purre-toggle)
+      const tidKnapp = document.getElementById("toggle-tid-knapp");
+
+      if (tidKnapp) {
+        tidKnapp.style.display = "block";
+        tidKnapp.onclick = () => {
+          visUtlaanstidAdmin = !visUtlaanstidAdmin; // Snu status
+          tidKnapp.innerText = visUtlaanstidAdmin
+            ? "⌛ Skjul tid"
+            : "⌛ Vis utlånstid";
+          hentUtstyr(); // Oppdater tabellen med den nye kilden
+        };
+      }
 
       // Vis logg og knapp for admin
       if (loggPanel) loggPanel.style.display = "block";
