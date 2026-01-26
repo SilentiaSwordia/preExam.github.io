@@ -282,6 +282,36 @@ async function hentLogg() {
   document.getElementById("logg-liste").innerHTML = html;
 }
 
+async function sendPurreEpost(mottakerEpost, navnPaautstyr) {
+  // 1. Bekreft i konsollen at vi har data
+  console.log(
+    "Sender purring til:",
+    mottakerEpost,
+    "for utstyr:",
+    navnPaautstyr,
+  );
+
+  // 2. Forenklet invoke uten manuelle headers
+  const { data, error } = await _supabase.functions.invoke(
+    "Varsel-om-utl-nstid",
+    {
+      // Vi sender objektet direkte, Supabase-klienten skal stringifisere dette
+      body: {
+        email: mottakerEpost,
+        utstyrNavn: navnPaautstyr,
+      },
+    },
+  );
+
+  if (error) {
+    console.error("Feil ved sending:", error);
+    alert("Kunne ikke sende e-post: " + error.message);
+  } else {
+    console.log("Suksess fra Resend:", data);
+    alert("Purring sendt til " + mottakerEpost);
+  }
+}
+
 async function simulerGammeltUtlaan(id) {
   const { error } = await _supabase.rpc("jukse_med_tiden", { utstyr_id: id });
   if (error) console.error(error);
@@ -314,15 +344,21 @@ async function oppdaterPurreVisning() {
       const faktiskeDager = Number.parseInt(item.dager_utlaant) || 0;
       const demoDager = faktiskeDager + 14;
       const sn = item.serienummer || "Mangler S/N";
+      // Inni data.forEach i oppdaterPurreVisning:
       html += `
-                <tr style="border-bottom: 1px solid #ffcccc;">
-                    <td style="padding: 8px;">${item.utstyr_navn}</td>
-                    <td style="padding: 8px; font-family: monospace;">${sn}</td>
-                    <td style="padding: 8px;">${item.email}</td>
-                    <td style="padding: 8px; font-weight: bold; color: #d00;">
-                        ${demoDager} dager
-                    </td>
-                </tr>`;
+    <tr style="border-bottom: 1px solid #ffcccc;">
+        <td style="padding: 8px;">${item.utstyr_navn}</td>
+        <td style="padding: 8px; font-family: monospace;">${sn}</td>
+        <td style="padding: 8px;">${item.email}</td>
+        <td style="padding: 8px; font-weight: bold; color: #d00;">
+            ${demoDager} dager
+        </td>
+        <td style="padding: 8px;">
+            <button onclick="sendPurreEpost('${item.email}', '${item.utstyr_navn}')" class="btn-status" style="background: #e74c3c;">
+                📧 Send purring
+            </button>
+        </td>
+    </tr>`;
     });
 
     html += "</table>";
