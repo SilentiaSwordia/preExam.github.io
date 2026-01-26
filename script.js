@@ -178,57 +178,78 @@ function visUtstyr(utstyrsListe) {
 }
 
 async function endreStatus(id, nåværendeStatus) {
-  // Finn ut hva den nye statusen skal være
-  const nyStatus = nåværendeStatus === "Ledig" ? "I bruk" : "Ledig";
-  const handling = nyStatus === "I bruk" ? "Sjekket ut" : "Levert inn";
+  console.log("Starter endring for enhet ID:", id);
 
-  // Hent brukeren som trykker på knappen
+  // 1. Hent informasjon om den innloggede brukeren
   const {
     data: { user },
   } = await _supabase.auth.getUser();
+  if (!user) return alert("Du må være logget inn for å gjøre dette!");
 
-  // NY LOGIKK:
-  // Hvis tingen blir 'I bruk', lagrer vi ID-en til brukeren i 'laant_av'.
-  // Hvis tingen blir 'Ledig', setter vi 'laant_av' til null (ingen har den lenger).
+  // 2. Sjekk om brukeren er admin
+  const { data: profil } = await _supabase
+    .from("profiler")
+    .select("er_admin")
+    .eq("id", user.id)
+    .single();
+
+  const erAdmin = profil?.er_admin || false;
+
+  // 3. Hent informasjon om hvem som har lånt utstyret akkurat nå
+  const { data: enhet } = await _supabase
+    .from("utstyr")
+    .select("laant_av")
+    .eq("id", id)
+    .single();
+
+  // 4. SIKKERHETSSJEKK: Kun tillat innlevering hvis man er låntaker eller admin
+  if (nåværendeStatus !== "Ledig") {
+    if (enhet.laant_av !== user.id && !erAdmin) {
+      alert(
+        "Tilgang nektet: Kun administrator eller den som lånte utstyret kan levere det inn.",
+      );
+      return; // Stopper funksjonen her
+    }
+  }
+
+  // 5. Definer nye verdier for oppdatering
+  const nyStatus = nåværendeStatus === "Ledig" ? "I bruk" : "Ledig";
   const hvemHarDen = nyStatus === "I bruk" ? user.id : null;
+  const handling = nyStatus === "I bruk" ? "Sjekket ut" : "Levert inn";
 
-  // 1. Forsøk å oppdatere utstyret med BÅDE status og laant_av
+  // 6. UTFØR OPPDATERINGEN I SUPABASE
   const { data, error: updateError } = await _supabase
     .from("utstyr")
     .update({
       status: nyStatus,
-      laant_av: hvemHarDen, // <--- Viktig tillegg!
+      laant_av: hvemHarDen,
     })
     .eq("id", id)
-    .select();
+    .select(); // .select() sikrer at vi får bekreftelse tilbake
 
-  // 2. Sjekk om oppdateringen faktisk ble utført (RLS-sjekk)
+  // Sjekk om oppdateringen ble avvist av RLS eller feilet
   if (updateError || !data || data.length === 0) {
-    console.error("Oppdatering avvist av RLS eller feil:", updateError);
-    alert("Du har ikke rettigheter til å endre status på dette utstyret.");
+    console.error("Oppdatering feilet:", updateError);
+    alert("Kunne ikke oppdatere databasen. Sjekk tilganger (RLS).");
     return;
   }
 
-  // 3. Logg handlingen i historikken
+  // 7. LOGGFØR HANDLINGEN
   const { error: logError } = await _supabase
     .from("utstyr_logg")
     .insert([{ utstyr_id: id, bruker_id: user.id, handling: handling }]);
 
-  if (logError) {
-    console.error("Kunne ikke lagre i logg:", logError.message);
-  }
+  if (logError) console.error("Kunne ikke lagre i logg:", logError.message);
 
-  // 4. Oppdater visningen på nettsiden
-  hentUtstyr();
+  // 8. AUTOMATISK OPPDATERING AV GRENSESNITTET
+  console.log("Oppdatering vellykket! Henter ferske data...");
 
-  // Oppdater loggen og purrevisningen hvis de finnes (for admin)
-  if (typeof hentLogg === "function") {
-    hentLogg();
-  }
+  // Vi bruker await for å sikre at vi henter data ETTER at endringen er lagret
+  await hentUtstyr();
 
-  if (typeof oppdaterPurreVisning === "function") {
-    oppdaterPurreVisning();
-  }
+  // Oppdaterer admin-paneler hvis de er synlige
+  if (typeof hentLogg === "function") hentLogg();
+  if (typeof oppdaterPurreVisning === "function") oppdaterPurreVisning();
 }
 
 async function hentLogg() {
@@ -283,32 +304,23 @@ async function hentLogg() {
 }
 
 async function sendPurreEpost(mottakerEpost, navnPaautstyr) {
-  // 1. Bekreft i konsollen at vi har data
-  console.log(
-    "Sender purring til:",
-    mottakerEpost,
-    "for utstyr:",
-    navnPaautstyr,
-  );
+  console.log("Sender purring til:", mottakerEpost, "for:", navnPaautstyr);
 
-  // 2. Forenklet invoke uten manuelle headers
   const { data, error } = await _supabase.functions.invoke(
     "Varsel-om-utl-nstid",
     {
-      // Vi sender objektet direkte, Supabase-klienten skal stringifisere dette
       body: {
-        email: mottakerEpost,
+        email: mottakerEpost, // Må matche interfacet i TypeScript
         utstyrNavn: navnPaautstyr,
       },
     },
   );
 
   if (error) {
-    console.error("Feil ved sending:", error);
-    alert("Kunne ikke sende e-post: " + error.message);
+    console.error("Detaljert feil fra Edge Function:", error);
+    alert("Kunne ikke sende e-post. Sjekk konsollen.");
   } else {
-    console.log("Suksess fra Resend:", data);
-    alert("Purring sendt til " + mottakerEpost);
+    alert("Suksess! Purring sendt til " + mottakerEpost);
   }
 }
 
